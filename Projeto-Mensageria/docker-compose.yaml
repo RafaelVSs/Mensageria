@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15 # Recomendo usar uma versão específica
+    container_name: mensageria-postgres
+    environment:
+      POSTGRES_USER: mensageria      # Defina seu usuário
+      POSTGRES_PASSWORD: 1234  # Defina uma senha forte
+      POSTGRES_DB: mensageria        # Defina o nome do banco de dados
+    ports:
+      - "5432:5432" # Mapeia a porta do container para a sua máquina local
+    volumes:
+      # Este volume garante que seus dados persistam mesmo se o container for recriado
+      - postgres-data:/var/lib/postgresql/data
+      # Este é o ponto principal: mapeia seus scripts .sql para o diretório de inicialização do Postgres
+      - ./db-init:/docker-entrypoint-initdb.d
+    restart: always
+
+volumes:
+  postgres-data:
