@@ -1,103 +1,112 @@
+# seu_projeto/db/models.py
+
 from sqlalchemy import (
     Column, Integer, String, DECIMAL, Date, ForeignKey, Boolean, DateTime,
-    Text, BigInteger, UUID
+    Text, BigInteger, UUID as UUID_TYPE # Renomeado para evitar conflito de nome
 )
 from sqlalchemy.orm import relationship
 from .database import Base
 from datetime import datetime
-
-# As classes abaixo representam as tabelas do seu banco de dados.
-# O nome da tabela é definido em __tablename__.
+import uuid # Importado para o default da coluna UUID
 
 class Customer(Base):
     __tablename__ = 'customer'
-
     id = Column(BigInteger, primary_key=True)
     name = Column(String(200), nullable=False)
     email = Column(String(100), nullable=False, unique=True)
     document = Column(String(20), nullable=False, unique=True)
-    
-    # Relação com a tabela Bookings
     bookings = relationship("Booking", back_populates="customer")
 
 class Hotel(Base):
     __tablename__ = 'hotel'
-
     id = Column(Integer, primary_key=True)
     name = Column(String(200), nullable=False)
     city = Column(String(100), nullable=False)
     state = Column(String(2), nullable=False)
-    
-    # Relação com a tabela Bookings
     bookings = relationship("Booking", back_populates="hotel")
 
 class RoomSubCategory(Base):
     __tablename__ = 'room_sub_categories'
-
     id = Column(String(10), primary_key=True)
     name = Column(String(100), nullable=False, unique=True)
-    
-    # Relação com a tabela RoomCategory
     room_categories = relationship("RoomCategory", back_populates="sub_category")
 
 class RoomCategory(Base):
     __tablename__ = 'room_categories'
-
     id = Column(String(10), primary_key=True)
     name = Column(String(100), nullable=False)
     sub_category_id = Column(String(10), ForeignKey('room_sub_categories.id'))
-    
-    # Relações
     sub_category = relationship("RoomSubCategory", back_populates="room_categories")
     booked_rooms = relationship("BookedRoom", back_populates="room_category")
 
 class Booking(Base):
     __tablename__ = 'bookings'
-
-    uuid = Column(UUID(as_uuid=True), primary_key=True)
+    # Adicionado default para garantir que novos registros tenham um UUID
+    uuid = Column(UUID_TYPE(as_uuid=True), primary_key=True, default=uuid.uuid4)
     customer_id = Column(BigInteger, ForeignKey('customer.id'), nullable=False)
     hotel_id = Column(Integer, ForeignKey('hotel.id'), nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
-    indexed_at = Column(DateTime(timezone=True), nullable=False)
+    indexed_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
     type = Column(String(20), nullable=False)
     source = Column(String(50), nullable=False)
     user_agent = Column(Text)
     ip_address = Column(String)
 
-    # Relações com outras tabelas
     customer = relationship("Customer", back_populates="bookings")
     hotel = relationship("Hotel", back_populates="bookings")
-    booked_rooms = relationship("BookedRoom", back_populates="booking", cascade="all, delete-orphan")
-    payments = relationship("Payment", back_populates="booking", cascade="all, delete-orphan")
+
+    # --- CORREÇÃO PRINCIPAL AQUI ---
+    # Removemos o argumento 'foreign_keys'. O SQLAlchemy já sabe como
+    # fazer o join pela declaração de ForeignKey em BookedRoom.
+    booked_rooms = relationship(
+        "BookedRoom",
+        back_populates="booking",
+        cascade="all, delete-orphan"
+    )
+
+    payments = relationship(
+        "Payment",
+        back_populates="booking",
+        cascade="all, delete-orphan"
+    )
 
 class BookedRoom(Base):
     __tablename__ = 'booked_rooms'
-    
     id = Column(BigInteger, primary_key=True)
-    booking_uuid = Column(UUID(as_uuid=True), ForeignKey('bookings.uuid', ondelete='CASCADE'), nullable=False)
+    # A declaração de ForeignKey aqui é tudo que o SQLAlchemy precisa.
+    booking_uuid = Column(UUID_TYPE(as_uuid=True), ForeignKey('bookings.uuid', ondelete='CASCADE'), nullable=False)
     room_category_id = Column(String(10), ForeignKey('room_categories.id'), nullable=False)
     room_number = Column(String(10))
     daily_rate = Column(DECIMAL(10, 2), nullable=False)
     number_of_days = Column(Integer, nullable=False)
-    total_amount = Column(DECIMAL(10, 2), nullable=False) # Total computado
+    total_amount = Column(DECIMAL(10, 2), nullable=False)
     checkin_date = Column(Date, nullable=False)
     checkout_date = Column(Date, nullable=False)
     guests = Column(Integer, nullable=False)
     breakfast_included = Column(Boolean, default=False)
     status = Column(String(20), nullable=False)
 
-    # Relações
-    booking = relationship("Booking", back_populates="booked_rooms")
+    # --- CORREÇÃO PRINCIPAL AQUI ---
+    # Também removemos o 'foreign_keys' daqui para manter a simplicidade.
+    # O 'back_populates' já faz a ligação bidirecional.
+    booking = relationship(
+        "Booking",
+        back_populates="booked_rooms"
+    )
     room_category = relationship("RoomCategory", back_populates="booked_rooms")
 
 class Payment(Base):
     __tablename__ = 'payments'
-    
-    id = Column(Integer, primary_key=True)
-    booking_uuid = Column(UUID(as_uuid=True), ForeignKey('bookings.uuid', ondelete='CASCADE'), nullable=False)
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    booking_uuid = Column(UUID_TYPE(as_uuid=True), ForeignKey('bookings.uuid', ondelete='CASCADE'), nullable=False)
     transaction_id = Column(String(255), unique=True)
     method = Column(String(50), nullable=False)
     status = Column(String(20), nullable=False)
-    
-    # Relação
-    booking = relationship("Booking", back_populates="payments")
+    amount = Column(DECIMAL(10, 2), nullable=False)
+
+    # --- CORREÇÃO PRINCIPAL AQUI ---
+    # Removemos o 'foreign_keys' daqui também.
+    booking = relationship(
+        "Booking",
+        back_populates="payments"
+    )

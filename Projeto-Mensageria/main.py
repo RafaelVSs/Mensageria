@@ -13,17 +13,6 @@ from db import models
 
 app = FastAPI(title="API de Reservas de Hotel")
 
-# A criação das tabelas deve ser assíncrona
-async def create_tables():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-@app.on_event("startup")
-async def startup_event():
-    # Chama a função assíncrona para criar as tabelas
-    await create_tables()
-    print("Tabelas do banco de dados criadas (se não existirem).")
-
 
 @app.get("/reserves", response_model=List[Dict[str, Any]])
 async def get_reserves(
