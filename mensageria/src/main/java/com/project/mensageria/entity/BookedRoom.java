@@ -9,6 +9,7 @@ import java.time.LocalDate;
 public class BookedRoom {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)

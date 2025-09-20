@@ -22,24 +22,19 @@ import java.util.UUID;
 @Service
 public class BookingService {
 
-    // Suas injeções de repositório permanecem as mesmas
     @Autowired private CustomerRepository customerRepository;
     @Autowired private HotelRepository hotelRepository;
     @Autowired private RoomSubCategoryRepository roomSubCategoryRepository;
     @Autowired private RoomCategoryRepository roomCategoryRepository;
     @Autowired private BookingRepository bookingRepository;
-    // O BookedRoomRepository e PaymentRepository não são mais usados aqui, mas podem ser úteis em outros lugares
-    // @Autowired private BookedRoomRepository bookedRoomRepository;
-    // @Autowired private PaymentRepository paymentRepository;
 
 
     @Transactional
     public void processAndSaveBooking(BookingMessage message) {
-        // --- ETAPA 1: Lida com entidades compartilhadas ---
+
         Customer customer = findOrCreateCustomer(message.customer);
         Hotel hotel = findOrCreateHotel(message.hotel);
 
-        // --- ETAPA 2: Monta a entidade Booking principal ---
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneOffset.UTC);
 
         Booking booking = new Booking();
@@ -53,22 +48,14 @@ public class BookingService {
         booking.setCustomer(customer);
         booking.setHotel(hotel);
 
-        // --- ETAPA 3: Cria e ASSOCIA as entidades filhas ---
-
-        // 1. Cria a lista de quartos e associa à reserva
         List<BookedRoom> rooms = createBookedRooms(message.rooms, booking);
         booking.setRooms(rooms);
 
-        // 2. Calcula o valor total a partir dos dados da mensagem
         BigDecimal totalAmount = calculateTotalAmount(message.rooms);
 
-        // 3. Cria o pagamento usando o valor calculado e o associa à reserva
         Payment payment = createPayment(message.payment, booking, totalAmount);
         booking.setPayment(payment);
 
-        // --- ETAPA 4: SALVA TUDO EM CASCATA ---
-        // Esta única chamada irá salvar a Booking, a lista de BookedRooms e o Payment
-        // graças à configuração `cascade = CascadeType.ALL` na entidade Booking.
         bookingRepository.save(booking);
     }
 
@@ -93,7 +80,7 @@ public class BookingService {
     }
 
     private Hotel findOrCreateHotel(BookingMessage.Hotel hotelDto) {
-        // Aplicando a mesma lógica de "Find, Update or Create" do Customer
+
         return hotelRepository.findById(hotelDto.id)
                 .map(hotel -> { // Se encontrou, atualiza os dados
                     hotel.setName(hotelDto.name);
@@ -122,8 +109,7 @@ public class BookingService {
             RoomCategory category = findOrCreateRoomCategory(roomDto.category, subCategory);
 
             BookedRoom bookedRoom = new BookedRoom();
-            bookedRoom.setId(roomDto.id);
-            bookedRoom.setBooking(booking); // Associação crucial!
+            bookedRoom.setBooking(booking);
             bookedRoom.setRoomCategory(category);
             bookedRoom.setRoomNumber(roomDto.roomNumber);
             bookedRoom.setDailyRate(roomDto.dailyRate);
@@ -157,8 +143,6 @@ public class BookingService {
         payment.setTransactionId(paymentDto.transactionId);
         payment.setMethod(paymentDto.method);
         payment.setStatus(paymentDto.status);
-        // --- CORREÇÃO AQUI ---
-        // Usamos o valor calculado, garantindo que ele nunca será nulo.
         payment.setAmount(totalAmount);
         return payment;
     }
